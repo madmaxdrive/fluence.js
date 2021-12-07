@@ -1,0 +1,17 @@
+{
+  "name": "@phanalpha/fluence.js",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "author": "tsai phan <phanalpha@hotmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@phanalpha/starkcrypto": "^0.1.2",
+    "axios": "^0.24.0",
+    "ethers": "^5.5.2"
+  },
+  "devDependencies": {
+    "gulp": "^4.0.2",
+    "gulp-typescript": "^6.0.0-alpha.1",
+    "typescript": "^4.5.2"
+  }
+}
