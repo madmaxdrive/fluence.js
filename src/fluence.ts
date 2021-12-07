@@ -111,7 +111,7 @@ export class Fluence {
     return tx.hash;
   }
 
-  async getOrder(id: string): Promise<LimitOrder> {
+  async getOrder(id: BNLike): Promise<LimitOrder> {
     const { data } = await this.a.get<LimitOrder>(`/orders/${id}`);
 
     return data;
