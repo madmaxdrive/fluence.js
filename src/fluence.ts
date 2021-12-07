@@ -42,7 +42,7 @@ export class Fluence {
     const { data } = await this.a.get<{ balance: number }>('/balance', {
       params: {
         user: String(await signer.deriveStarkKey()),
-        contact: contract || 0,
+        contract: contract || 0,
       },
     });
 
