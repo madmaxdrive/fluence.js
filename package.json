@@ -1,9 +1,13 @@
 {
   "name": "@phanalpha/fluence.js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "author": "tsai phan <phanalpha@hotmail.com>",
   "license": "MIT",
+  "files": [
+    "dist/"
+  ],
   "dependencies": {
     "@phanalpha/starkcrypto": "^0.1.2",
     "axios": "^0.24.0",
