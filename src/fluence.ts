@@ -4,6 +4,7 @@ import { BigNumber, Contract, Signer } from 'ethers';
 import { TransactionResponse } from '@ethersproject/abstract-provider';
 import { BNLike, StackSigner } from './signer';
 import fluenceABI from './fluence.json';
+import forwarderABI from './MinimalForwarder.json';
 
 interface Tx {
   transaction_hash: string;
@@ -24,7 +25,21 @@ export class Fluence {
     return new Contract(address, fluenceABI, signer);
   }
 
-  constructor(private a: AxiosInstance, private fluence: Contract, private l2ContractAddress: string) {
+  static forwarder(address: string, signer: Signer) {
+    return new Contract(address, forwarderABI, signer);
+  }
+
+  constructor(private a: AxiosInstance, private fluence: Contract, private forwarder: Contract, private l2ContractAddress: string) {
+  }
+
+  async registerContract(contract: string, minter: BNLike): Promise<string> {
+    const { data } = await this.a.post<{ req: any, signature: string }>('/contracts', {
+      contract,
+      minter: String(minter),
+    });
+    const tx = await this.forwarder.execute(data.req, data.signature, { gasLimit: 200000 });
+
+    return tx.hash;
   }
 
   async registerClient(account: string, signer: StackSigner): Promise<string> {
