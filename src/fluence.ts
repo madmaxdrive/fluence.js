@@ -3,8 +3,8 @@ import BN from 'bn.js';
 import { BigNumber, Contract, Signer } from 'ethers';
 import { TransactionResponse } from '@ethersproject/abstract-provider';
 import { BNLike, StackSigner } from './signer';
-import fluenceABI from './fluence.json';
-import forwarderABI from './MinimalForwarder.json';
+import fluenceABI from './Fluence.json';
+import forwarderABI from './FluenceForwarder.json';
 
 interface Tx {
   transaction_hash: string;
@@ -206,4 +206,4 @@ export class Fluence {
   }
 }
 
-export { fluenceABI };
+export { fluenceABI, forwarderABI };
