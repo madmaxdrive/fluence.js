@@ -1,6 +1,6 @@
 {
   "name": "@phanalpha/fluence",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "author": "tsai phan <phanalpha@hotmail.com>",
@@ -10,7 +10,9 @@
   ],
   "dependencies": {
     "@phanalpha/starkcrypto": "^0.1.2",
+    "@types/crypto-js": "^4.0.2",
     "axios": "^0.24.0",
+    "crypto-js": "^4.1.1",
     "ethers": "^5.5.2"
   },
   "devDependencies": {

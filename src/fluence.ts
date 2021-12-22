@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import BN from 'bn.js';
 import { BigNumber, Contract, Signer } from 'ethers';
 import { TransactionResponse } from '@ethersproject/abstract-provider';
+import sha1 from 'crypto-js/sha1';
 import { BNLike, StackSigner } from './signer';
 import fluenceABI from './Fluence.json';
 import forwarderABI from './FluenceForwarder.json';
@@ -20,6 +21,23 @@ export interface LimitOrder {
   readonly state: number;
 }
 
+export function sha1n(permanentId: string) {
+  return new BN(String(sha1(permanentId)), 16);
+}
+
+export interface Collection {
+  readonly address: string;
+  readonly name: string;
+  readonly symbol: string;
+  readonly baseURI: string;
+  readonly image: string;
+  readonly blueprint?: string;
+}
+
+export function parseN(s: string): BN {
+  return s.toLowerCase().startsWith('0x') ? new BN(s.slice(2), 16) : new BN(s);
+}
+
 export class Fluence {
   static contract(address: string, signer: Signer) {
     return new Contract(address, fluenceABI, signer);
@@ -32,11 +50,23 @@ export class Fluence {
   constructor(private a: AxiosInstance, private fluence: Contract, private forwarder: Contract, private l2ContractAddress: string) {
   }
 
-  async registerContract(contract: string, minter: BNLike): Promise<string> {
-    const { data } = await this.a.post<{ req: any, signature: string }>('/contracts', {
-      contract,
-      minter: String(minter),
+  async createBlueprint(permanentId: string, signer: StackSigner): Promise<void> {
+    const [starkKey, { r, s }] = await signer.sign([sha1n(permanentId)]);
+
+    await this.a.post(`/blueprints?signature=${r},${s}`, {
+      permanent_id: permanentId,
+      minter: String(starkKey),
     });
+  }
+
+  async registerCollection(
+    { address, name, symbol, baseURI, image, blueprint }: Collection,
+    signer: StackSigner): Promise<string> {
+    const [starkKey, { r, s }] = await signer.sign([
+      parseN(address), sha1n(name), sha1n(symbol), sha1n(baseURI), sha1n(image) ]);
+    const { data } = await this.a.post<{ req: any, signature: string }>(
+      `/collections?signature=${r},${s}`,
+      { address, name, symbol, base_uri: baseURI, image, blueprint, minter: String(starkKey) });
     const tx = await this.forwarder.execute(data.req, data.signature, { gasLimit: 200000 });
 
     return tx.hash;
@@ -44,7 +74,7 @@ export class Fluence {
 
   async registerClient(account: string, signer: StackSigner): Promise<string> {
     const nonce = new BN(Date.now() / 1e3);
-    const [starkKey, { r, s }] = await signer.sign([new BN(account.slice(2), 16), nonce]);
+    const [starkKey, { r, s }] = await signer.sign([parseN(account), nonce]);
     const { data } = await this.a.post<Tx>(`/clients?signature=${r},${s}`, {
       public_key: String(starkKey),
       address: account,
