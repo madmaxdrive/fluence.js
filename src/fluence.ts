@@ -6,6 +6,7 @@ import sha1 from 'crypto-js/sha1';
 import { BNLike, StackSigner } from './signer';
 import fluenceABI from './Fluence.json';
 import forwarderABI from './FluenceForwarder.json';
+import { Nonce, TimestampNonce } from './nonce';
 
 interface Tx {
   transaction_hash: string;
@@ -21,17 +22,57 @@ export interface LimitOrder {
   readonly state: number;
 }
 
-export function sha1n(permanentId: string) {
-  return new BN(String(sha1(permanentId)), 16);
+export interface Account {
+  readonly stark_key: string;
+  readonly address?: string;
 }
 
-export interface Collection {
+export interface Blueprint {
+  readonly permanent_id?: string;
+  readonly minter?: Account;
+  readonly expire_at?: string;
+}
+
+interface BaseCollection {
   readonly address: string;
   readonly name: string;
   readonly symbol: string;
   readonly baseURI: string;
   readonly image: string;
+}
+
+export interface NewCollection extends BaseCollection {
   readonly blueprint?: string;
+}
+
+export interface Collection extends BaseCollection {
+  readonly fungible: boolean;
+  readonly blueprint: Blueprint;
+}
+
+export interface Metadata {
+  readonly name: string;
+  readonly description: string;
+  readonly image: string;
+}
+
+export interface Token extends Metadata {
+  readonly contract: Collection;
+  readonly token_id: string;
+}
+
+export interface Pagination {
+  readonly page?: number;
+  readonly size?: number;
+}
+
+export interface Fragment<T> {
+  readonly data: T[];
+  readonly total: number;
+}
+
+export function sha1n(permanentId: string) {
+  return new BN(String(sha1(permanentId)), 16);
 }
 
 export function parseN(s: string): BN {
@@ -47,7 +88,37 @@ export class Fluence {
     return new Contract(address, forwarderABI, signer);
   }
 
-  constructor(private a: AxiosInstance, private fluence: Contract, private forwarder: Contract, private l2ContractAddress: string) {
+  private nonce: Nonce;
+
+  constructor(
+    private a: AxiosInstance,
+    private fluence: Contract,
+    private forwarder: Contract,
+    private l2ContractAddress: string,
+    nonce?: Nonce) {
+    this.nonce = nonce || new TimestampNonce();
+  }
+
+  async registerClient(account: string, signer: StackSigner): Promise<string> {
+    const nonce = this.nonce.next();
+    const [starkKey, { r, s }] = await signer.sign([parseN(account), nonce]);
+    const { data } = await this.a.post<Tx>(`/clients?signature=${r},${s}`, {
+      stark_key: String(starkKey),
+      address: account,
+      nonce: String(nonce),
+    });
+
+    return data.transaction_hash;
+  }
+
+  async getClient(account: string): Promise<BN> {
+    const { data } = await this.a.get<{ stark_key: string }>('/clients', {
+      params: {
+        address: account,
+      },
+    });
+
+    return parseN(data.stark_key)
   }
 
   async createBlueprint(permanentId: string, signer: StackSigner): Promise<void> {
@@ -60,7 +131,7 @@ export class Fluence {
   }
 
   async registerCollection(
-    { address, name, symbol, baseURI, image, blueprint }: Collection,
+    { address, name, symbol, baseURI, image, blueprint }: NewCollection,
     signer: StackSigner): Promise<string> {
     const [starkKey, { r, s }] = await signer.sign([
       parseN(address), sha1n(name), sha1n(symbol), sha1n(baseURI), sha1n(image) ]);
@@ -72,37 +143,44 @@ export class Fluence {
     return tx.hash;
   }
 
-  async registerClient(account: string, signer: StackSigner): Promise<string> {
-    const nonce = new BN(Date.now() / 1e3);
-    const [starkKey, { r, s }] = await signer.sign([parseN(account), nonce]);
-    const { data } = await this.a.post<Tx>(`/clients?signature=${r},${s}`, {
-      public_key: String(starkKey),
-      address: account,
+  async findCollections(params: Pagination & { owner?: string }): Promise<Fragment<Collection>> {
+    const { data } = await this.a.get<Fragment<Collection>>('/collections', { params })
+
+    return data;
+  }
+
+  async saveMetadata<T extends Metadata>(
+    contract: string, tokenId: BN, nonce: BN, metadata: T, signer: StackSigner): Promise<Token> {
+    const [_, { r, s }] = await signer.sign([ parseN(contract), tokenId, nonce ]);
+    const { data } = await this.a.put<Token>(
+      `/collections/${contract}/tokens/${tokenId}/_metadata?signature=${r},${s}`, metadata);
+
+    return data;
+  }
+
+  async findMetadata<T extends Metadata = Metadata>(contract: string, tokenId: BN): Promise<T> {
+    const { data } = await this.a.get<T>(`/collections/${contract}/tokens/${tokenId}/_metadata`);
+
+    return data;
+  }
+
+  async mint(to: BN, tokenId: BN, contract: string, signer: StackSigner): Promise<string> {
+    const nonce = this.nonce.next();
+    const [_, { r, s }] = await signer.sign([to, tokenId, parseN(contract), nonce]);
+    const { data } = await this.a.post<Tx>(`/mint?signature=${r},${s}`, {
+      user: String(to),
+      amount_or_token_id: tokenId,
+      contract,
       nonce: String(nonce),
     });
 
     return data.transaction_hash;
   }
 
-  async getClient(account: string): Promise<BN> {
-    const { data } = await this.a.get<{ public_key: string }>('/clients', {
-      params: {
-        address: account,
-      },
-    });
+  async findTokens(params: Pagination & { owner?: string, collection: string; }): Promise<Fragment<Token>> {
+    const { data } = await this.a.get<Fragment<Token>>(`/tokens`, { params });
 
-    return new BN(data.public_key.slice(2), 16);
-  }
-
-  async mint(signer: StackSigner, tokenId: BNLike, contract: string): Promise<string> {
-    const { data } = await this.a.post<Tx>('/mint', {
-      user: String(await signer.deriveStarkKey()),
-      amount_or_token_id: tokenId,
-      contract,
-      token: 2,
-    });
-
-    return data.transaction_hash;
+    return data;
   }
 
   async getBalance(signer: StackSigner, contract?: string): Promise<BN> {
@@ -150,7 +228,7 @@ export class Fluence {
   }
 
   async withdraw(account: string, signer: StackSigner, amountOrTokenId: BNLike, contract?: string): Promise<string> {
-    const nonce = new BN(Date.now() / 1e3);
+    const nonce = this.nonce.next();
     const [starkKey, { r, s }] = await signer.sign([
       amountOrTokenId,
       new BN(contract?.slice(2) || 0, 16),
@@ -217,7 +295,7 @@ export class Fluence {
   }
 
   async cancelOrder(signer: StackSigner, id: BNLike): Promise<string> {
-    const nonce = new BN(Date.now() / 1e3);
+    const nonce = this.nonce.next();
     const [_, { r, s }] = await signer.sign([id, nonce]);
     const { data } = await this.a.delete<Tx>(`/orders/${id}?signature=${r},${s}&nonce=${nonce}`);
 
@@ -225,7 +303,7 @@ export class Fluence {
   }
 
   async fulfillOrder(signer: StackSigner, id: BNLike): Promise<string> {
-    const nonce = new BN(Date.now() / 1e3);
+    const nonce = this.nonce.next();
     const [starkKey, { r, s }] = await signer.sign([id, nonce]);
     const { data } = await this.a.post<Tx>(`/orders/${id}?signature=${r},${s}`, {
       user: String(starkKey),
