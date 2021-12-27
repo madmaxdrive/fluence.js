@@ -137,7 +137,8 @@ export class Fluence {
       parseN(address), sha1n(name), sha1n(symbol), sha1n(baseURI), sha1n(image) ]);
     const { data } = await this.a.post<{ req: any, signature: string }>(
       `/collections?signature=${r},${s}`,
-      { address, name, symbol, base_uri: baseURI, image, blueprint, minter: String(starkKey) });
+      { address, name, symbol, base_uri: baseURI, image,
+	...blueprint ? { blueprint } : { minter: String(starkKey) } });
     const tx = await this.forwarder.execute(data.req, data.signature, { gasLimit: 200000 });
 
     return tx.hash;
@@ -177,7 +178,7 @@ export class Fluence {
     return data.transaction_hash;
   }
 
-  async findTokens(params: Pagination & { owner?: string, collection: string; }): Promise<Fragment<Token>> {
+  async findTokens(params: Pagination & { owner?: string, collection?: string; }): Promise<Fragment<Token>> {
     const { data } = await this.a.get<Fragment<Token>>(`/tokens`, { params });
 
     return data;
@@ -227,7 +228,7 @@ export class Fluence {
     ].map(({ hash }: TransactionResponse) => hash);
   }
 
-  async withdraw(account: string, signer: StackSigner, amountOrTokenId: BNLike, contract?: string): Promise<string> {
+  async withdraw(account: string, signer: StackSigner, amountOrTokenId: BN, contract?: string): Promise<string> {
     const nonce = this.nonce.next();
     const [starkKey, { r, s }] = await signer.sign([
       amountOrTokenId,
@@ -237,7 +238,7 @@ export class Fluence {
     ]);
     const { data } = await this.a.post<Tx>(`/withdraw?signature=${r},${s}`, {
       user: String(starkKey),
-      amount_or_token_id: amountOrTokenId,
+      amount_or_token_id: String(amountOrTokenId),
       contract: contract || 0,
       address: account,
       nonce: String(nonce),
