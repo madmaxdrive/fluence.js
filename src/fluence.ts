@@ -12,7 +12,7 @@ interface Tx {
   transaction_hash: string;
 }
 
-enum OrderState {
+export enum OrderState {
   New = 0,
   Fulfilled = 1,
   Cancelled = 2,
@@ -255,7 +255,7 @@ export class Fluence {
     return data.transaction_hash;
   }
 
-  async doWithdraw(account: string, amountOrTokenId: BN, contract?: string, mint?: boolean) {
+  async doWithdraw(account: string, amountOrTokenId: BN, contract?: string, mint?: boolean): Promise<string> {
     const tx: TransactionResponse = await this.fluence.withdraw(
       this.l2ContractAddress,
       account,
@@ -266,6 +266,25 @@ export class Fluence {
     );
 
     return tx.hash;
+  }
+
+  async transfer(signer: StackSigner, to: BN, amountOrTokenId: BN, contract: string): Promise<string> {
+    const nonce = this.nonce.next();
+    const [starkKey, { r, s }] = await signer.sign([
+      to,
+      amountOrTokenId,
+      parseN(contract),
+      nonce,
+    ]);
+    const { data } = await this.a.post<Tx>(`/transfer?signature=${r},${s}`, {
+      from: String(starkKey),
+      to: String(to),
+      amount_or_token_id: String(amountOrTokenId),
+      contract,
+      nonce: String(nonce),
+    });
+
+    return data.transaction_hash;
   }
 
   async findOrders(params: Pagination & {
