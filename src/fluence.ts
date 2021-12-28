@@ -205,6 +205,25 @@ export class Fluence {
     return new BN(data.owner);
   }
 
+  async transfer(signer: StackSigner, amountOrTokenId: BNLike, contract: string, to: BNLike) {
+    const nonce = this.nonce.next();
+    const [starkKey, { r, s }] = await signer.sign([
+      to,
+      amountOrTokenId,
+      new BN(contract?.slice(2) || 0, 16),
+      nonce,
+    ]);
+    const { data } = await this.a.post<Tx>(`/transfer?signature=${r},${s}`, {
+      from: String(starkKey),
+      to: String(to),
+      'amount_or_token_id': amountOrTokenId,
+      contract,
+      nonce: String(nonce)
+    });
+
+    return data.transaction_hash;
+  }
+
   async deposit(signer: StackSigner, amountOrTokenId: BNLike, contract?: Contract): Promise<string[]> {
     if (!contract) {
       const tx: TransactionResponse = await this.fluence['deposit(uint256,uint256)'](
