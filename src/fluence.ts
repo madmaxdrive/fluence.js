@@ -211,7 +211,7 @@ export class Fluence {
     const [_, { r, s }] = await signer.sign([to, tokenId, parseN(contract), nonce]);
     const { data } = await this.a.post<Tx>(`/mint?signature=${r},${s}`, {
       user: String(to),
-      amount_or_token_id: String(tokenId),
+      token_id: String(tokenId),
       contract,
       nonce: String(nonce),
     });
