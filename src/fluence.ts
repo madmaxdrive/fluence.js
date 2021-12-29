@@ -236,7 +236,7 @@ export class Fluence {
     ].map(({ hash }: TransactionResponse) => hash);
   }
 
-  async withdraw(account: string, signer: StackSigner, amountOrTokenId: BN, contract?: string): Promise<string> {
+  async withdraw(account: string, signer: StackSigner, amountOrTokenId: BN, contract?: string): Promise<[string, BN]> {
     const nonce = this.nonce.next();
     const [starkKey, { r, s }] = await signer.sign([
       amountOrTokenId,
@@ -252,16 +252,17 @@ export class Fluence {
       nonce: String(nonce),
     });
 
-    return data.transaction_hash;
+    return [data.transaction_hash, nonce];
   }
 
-  async doWithdraw(account: string, amountOrTokenId: BN, contract?: string, mint?: boolean): Promise<string> {
+  async doWithdraw(account: string, amountOrTokenId: BN, nonce: BN, contract?: string, mint?: boolean): Promise<string> {
     const tx: TransactionResponse = await this.fluence.withdraw(
       this.l2ContractAddress,
       account,
       BigNumber.from(String(amountOrTokenId)),
       contract || '0x0000000000000000000000000000000000000000',
       mint || false,
+      BigNumber.from(String(nonce)),
       { gasLimit: 200000 }
     );
 
