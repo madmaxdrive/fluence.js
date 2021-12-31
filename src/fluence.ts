@@ -44,7 +44,7 @@ export interface NewCollection extends BaseCollection {
 export interface Collection extends BaseCollection {
   readonly fungible: boolean;
   readonly decimals: number;
-  readonly blueprint: Blueprint;
+  readonly blueprint?: Blueprint;
 }
 
 export interface Metadata {
@@ -65,7 +65,7 @@ export interface LimitOrder {
   readonly token: Token;
   readonly quote_contract: Collection;
   readonly quote_amount: string;
-  readonly state: OrderState;
+  readonly state: 'NEW' | 'FULFILLED' | 'CANCELLED';
 }
 
 export interface PlainLimitOrder {
@@ -149,6 +149,12 @@ export class Fluence {
     return data;
   }
 
+  async getCollection(contract: string): Promise<Collection> {
+    const { data } = await this.a.get<Collection>(`/collections/${contract}`);
+
+    return data;
+  }
+
   async registerCollection(
     { address, name, symbol, baseURI, image, blueprint }: NewCollection,
     signer: StackSigner): Promise<string> {
@@ -180,6 +186,12 @@ export class Fluence {
 
   async findTokens(params: Pagination & { owner?: string; collection?: string; }): Promise<Fragment<Token>> {
     const { data } = await this.a.get<Fragment<Token>>('/tokens', { params });
+
+    return data;
+  }
+
+  async getToken(contract: string, tokenId: string): Promise<Token> {
+    const { data } = await this.a.get<Token>(`/collections/${contract}/tokens/${tokenId}`);
 
     return data;
   }
@@ -315,7 +327,7 @@ export class Fluence {
       parseN(quoteContract),
       quoteAmount,
     ]);
-    const { data } = await this.a.put<Tx>(`/orders?signature=${r},${s}`, {
+    const { data } = await this.a.post<Tx>(`/orders?signature=${r},${s}`, {
       order_id: String(orderId),
       user: String(starkKey),
       bid,
