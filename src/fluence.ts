@@ -34,6 +34,8 @@ interface BaseCollection {
   readonly name: string;
   readonly symbol: string;
   readonly image: string;
+  readonly background_image?: string;
+  readonly description?: string;
 }
 
 export interface NewCollection extends BaseCollection {
@@ -44,6 +46,9 @@ export interface NewCollection extends BaseCollection {
 export interface Collection extends BaseCollection {
   readonly fungible: boolean;
   readonly decimals: number;
+}
+
+export interface CollectionVerbose extends Collection {
   readonly blueprint?: Blueprint;
 }
 
@@ -58,14 +63,22 @@ export interface Token extends Metadata {
   readonly token_id: string;
 }
 
-export interface LimitOrder {
+export interface TokenVerbose extends Token {
+  readonly owner?: Account;
+  readonly ask?: BaseLimitOrder;
+}
+
+export interface BaseLimitOrder {
   readonly order_id: string;
-  readonly user: Account;
   readonly bid: boolean;
-  readonly token: Token;
   readonly quote_contract: Collection;
   readonly quote_amount: string;
   readonly state: 'NEW' | 'FULFILLED' | 'CANCELLED';
+}
+
+export interface LimitOrder extends BaseLimitOrder {
+  readonly user: Account;
+  readonly token: Token;
 }
 
 export interface PlainLimitOrder {
@@ -143,14 +156,17 @@ export class Fluence {
     });
   }
 
-  async findCollections(params: Pagination & { owner?: string }): Promise<Fragment<Collection>> {
-    const { data } = await this.a.get<Fragment<Collection>>('/collections', { params })
+  async findCollections(params: Pagination & {
+    owner?: string;
+    fungible?: boolean;
+  }): Promise<Fragment<CollectionVerbose>> {
+    const { data } = await this.a.get<Fragment<CollectionVerbose>>('/collections', { params })
 
     return data;
   }
 
-  async getCollection(contract: string): Promise<Collection> {
-    const { data } = await this.a.get<Collection>(`/collections/${contract}`);
+  async getCollection(contract: string): Promise<CollectionVerbose> {
+    const { data } = await this.a.get<CollectionVerbose>(`/collections/${contract}`);
 
     return data;
   }
@@ -184,14 +200,20 @@ export class Fluence {
     return data;
   }
 
-  async findTokens(params: Pagination & { owner?: string; collection?: string; }): Promise<Fragment<Token>> {
-    const { data } = await this.a.get<Fragment<Token>>('/tokens', { params });
+  async findTokens(params: Pagination & {
+    q?: string;
+    owner?: string;
+    collection?: string;
+    sort?: 'token_id' | 'name';
+    asc?: boolean;
+  }): Promise<Fragment<TokenVerbose>> {
+    const { data } = await this.a.get<Fragment<TokenVerbose>>('/tokens', { params });
 
     return data;
   }
 
-  async getToken(contract: string, tokenId: string): Promise<Token> {
-    const { data } = await this.a.get<Token>(`/collections/${contract}/tokens/${tokenId}`);
+  async getToken(contract: string, tokenId: string): Promise<TokenVerbose> {
+    const { data } = await this.a.get<TokenVerbose>(`/collections/${contract}/tokens/${tokenId}`);
 
     return data;
   }
@@ -301,10 +323,13 @@ export class Fluence {
   }
 
   async findOrders(params: Pagination & {
+    q?: string;
     user?: string;
     collection?: string;
     side?: 'ask' | 'bid';
     state?: OrderState;
+    sort?: 'price';
+    asc?: boolean;
   }): Promise<Fragment<LimitOrder>> {
     const { data } = await this.a.get<Fragment<LimitOrder>>('/orders', { params });
 
