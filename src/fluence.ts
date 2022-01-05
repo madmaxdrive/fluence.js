@@ -172,13 +172,26 @@ export class Fluence {
   }
 
   async registerCollection(
-    { address, name, symbol, baseURI, image, blueprint }: NewCollection,
+    { address, name, symbol, baseURI, image, background_image, description, blueprint }: NewCollection,
     signer: StackSigner): Promise<string> {
     const [starkKey, { r, s }] = await signer.sign([
-      parseN(address), sha1n(name), sha1n(symbol), sha1n(baseURI), sha1n(image) ]);
+      parseN(address),
+      sha1n(name),
+      sha1n(symbol),
+      sha1n(baseURI),
+      sha1n(image),
+      sha1n(background_image || ''),
+      sha1n(description || ''),
+    ]);
     const { data } = await this.a.post<{ req: any, signature: string }>(
       `/collections?signature=${r},${s}`,
-      { address, name, symbol, base_uri: baseURI, image,
+      { address,
+        name,
+        symbol,
+        base_uri: baseURI,
+        image,
+        ...background_image && { background_image },
+        ...description && { description },
 	...blueprint ? { blueprint } : { minter: String(starkKey) } });
     const tx = await this.forwarder.execute(data.req, data.signature, { gasLimit: 200000 });
 
