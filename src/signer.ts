@@ -7,12 +7,12 @@ import { getAccountPath, grindKey, pedersen, sign, starkEc } from '@phanalpha/st
 
 export type BNLike = ConstructorParameters<typeof BN>[0];
 
-export interface StackSigner {
+export interface StarkSigner {
   deriveStarkKey(): Promise<BN>;
   sign(message: BNLike[]): Promise<[BN, ec.Signature]>;
 }
 
-export class Web3StarkSigner implements StackSigner {
+export class Web3StarkSigner implements StarkSigner {
   constructor(private signer: Signer, private layer: string, private application: string, private message: string) {
   }
 
