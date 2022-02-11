@@ -109,7 +109,7 @@ export function parseN(s: string): BN {
   return s.toLowerCase().startsWith('0x') ? new BN(s.slice(2), 16) : new BN(s);
 }
 
-class StarkWallet implements StarkSigner {
+export class StarkWallet implements StarkSigner {
   private _nonce: Nonce;
 
   constructor(private _signer: StarkSigner, nonce?: Nonce) {
