@@ -23,6 +23,28 @@ export interface Account {
   readonly address?: string;
 }
 
+export interface StarkBlock {
+  readonly number: number;
+  readonly hash: string;
+  readonly timestamp: string;
+}
+
+export interface StarkTransaction {
+  readonly hash: string;
+  readonly block: StarkBlock;
+}
+
+export interface EtherBlock {
+  readonly number: number;
+  readonly hash: string;
+  readonly timestamp: string;
+}
+
+export interface EtherEvent {
+  readonly hash: string;
+  readonly block: EtherBlock;
+}
+
 export interface Blueprint {
   readonly permanent_id?: string;
   readonly minter: Account;
@@ -52,6 +74,26 @@ export interface CollectionVerbose extends Collection {
   readonly blueprint?: Blueprint;
 }
 
+export interface Balance {
+  contract: Collection;
+  amount: string;
+}
+
+export interface Deposit {
+  readonly transaction: StarkTransaction;
+  readonly balance: Balance;
+  readonly amount: string;
+}
+
+export interface Withdrawal {
+  readonly transaction: StarkTransaction;
+  readonly balance: Balance;
+  readonly amount: string;
+  readonly address: string;
+  readonly nonce?: string;
+  readonly receipt?: EtherEvent;
+}
+
 export interface Metadata {
   readonly name: string;
   readonly description: string;
@@ -68,6 +110,17 @@ export interface TokenVerbose extends Token {
   readonly ask?: BaseLimitOrder;
 }
 
+export type FlowType = 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'MINT';
+
+export interface TokenFlow<T extends FlowType = FlowType> {
+  readonly transaction: StarkTransaction;
+  readonly type: FlowType;
+  readonly token: Token;
+  readonly address: string;
+  readonly nonce?: string;
+  readonly receipt?: EtherEvent;
+}
+
 export interface BaseLimitOrder {
   readonly order_id: string;
   readonly bid: boolean;
@@ -79,6 +132,8 @@ export interface BaseLimitOrder {
 export interface LimitOrder extends BaseLimitOrder {
   readonly user: Account;
   readonly token: Token;
+  readonly tx: StarkTransaction;
+  readonly closed_tx?: StarkTransaction;
 }
 
 export interface PlainLimitOrder {
@@ -311,6 +366,35 @@ export class FluenceClient {
     });
 
     return data.transaction_hash;
+  }
+
+  async findDeposits(params: Pagination & {
+    user: string;
+    contract?: string;
+    fungible?: boolean;
+  }): Promise<Fragment<Deposit | TokenFlow<'DEPOSIT'>>> {
+    const { data } = await this.a.get<Fragment<Deposit | TokenFlow<'DEPOSIT'>>>('/deposits', { params });
+
+    return data;
+  }
+
+  async findWithdrawals(params: Pagination & {
+    user: string;
+    contract?: string;
+    fungible?: boolean;
+  }): Promise<Fragment<Withdrawal | TokenFlow<'WITHDRAWAL'>>> {
+    const { data } = await this.a.get<Fragment<Withdrawal | TokenFlow<'WITHDRAWAL'>>>('/withdrawals', { params });
+
+    return data;
+  }
+
+  async findMints(params: Pagination & {
+    user: string;
+    contract?: string;
+  }): Promise<Fragment<TokenFlow<'MINT'>>> {
+    const { data } = await this.a.get<Fragment<TokenFlow<'MINT'>>>('/mints', { params });
+
+    return data;
   }
 
   async findOrders(params: Pagination & {
